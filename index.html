@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" 
+                integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" 
+                crossorigin="anonymous">
+    <title>Chat-App</title>
+</head>
+<body>
+    <div id="app" style="margin-top: 30px;">
+       <div class="container">
+         <div class="col-lg-6 offset-lg-3">
+
+          <div v-if="ready">
+            <p v-for="info in infos">{{ info.name }} {{ info.type }}</p>
+          </div>
+
+
+           <div>
+             <!-- <h4>Set Your Name</h4> -->
+            <form @submit.prevent="addName">
+              <div class="form-group row" v-if="!ready">
+
+                <input type="text" class="form-control col-9" v-model="name" placeholder="Give your name">
+                <input type="submit" value="Add" class="btn btn-sm ml-1 text-white" style="background-color: #a716fa;">
+            </form>
+           </div>
+
+           <h2 v-if="ready" style="color: #a716fa;">{{ name }}</h2>
+          <div class="card" style="background-color: #a716fa;" v-if="ready">
+            <div class="card-header text-white font-weight-bold">
+               Chatting App <span class="float-right">{{ connections }} Connections</span>
+            </div>
+            <ul class="list-group list-group-flush">
+              <small v-if="typing" class="text-white" style="margin-left: 5px;">{{ typing }} is typing...</small>
+              <li class="list-group-item font-weight-bold" v-for="message in messages">
+                <span :class="{'float-right' : message.type === 0}">
+                  <small style="color:#a716fa; font-weight: bold;">{{ message.by }}:</small>
+                  {{ message.message }}
+                  
+                </span>
+                
+              </li>
+          
+            </ul>
+            <div class="card-body">
+              <form @submit.prevent="send">
+                <div class="form-group row">
+  
+                  <input type="text" class="form-control" v-model="newMessage" placeholder="type message...">
+                  <input type="submit" value="Send" class="btn btn-sm ml-1 text-white mt-2">
+                </div>
+              </form>
+            </div>
+          </div>
+         </div>
+       
+       </div>
+    </div>
+
+    
+    <script src="/socket.io/socket.io.js" type="application/javascript"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.js" type="application/javascript"></script>
+  
+<script type="application/javascript">
+  // type: 0 = sendind
+  // type: 1 = receiving
+  var socket = io();
+  let app = new Vue({
+    el: '#app',
+    data: {
+        newMessage: null,
+        messages: [],
+        typing: false,
+        name: null,
+        ready: false,
+        infos: [],
+        connections: 0
+    },
+
+     watch: {
+       newMessage(value){
+         value ? socket.emit('typing', this.name) : socket.emit('stopTyping')
+       }
+  },
+
+    created(){
+
+        window.onbeforeunload = () => {
+          socket.emit('leaved', this.name)
+        }
+
+        socket.on('connections', (data) => {
+          this.connections = data
+        })
+
+      // to listen and give response to the server
+      socket.emit('created', 'Ramesh');
+      socket.on('created', (data)=>{
+            console.log(data);
+      })
+       // this one  is for who is receiving message
+      socket.on('chat-message', (data) => {
+          this.messages.push({message: data.message, type: 1, by: data.user});
+      })
+
+
+      //this is for typing and stopTyping  
+        socket.on('typing', (name) => {
+          this.typing = name
+        })
+        socket.on('stopTyping', () => {
+          this.typing = false
+        })
+
+        socket.on('joined', (data) => {
+            this.infos.push({name: data, type: 'Joined'})
+            setTimeout(() => {
+              this.infos = []
+            }, 5000);
+        })
+        
+        socket.on('leaved', (data) => {
+            this.infos.push({name: data, type: 'Leaved'})
+            setTimeout(() => {
+              this.infos = []
+            }, 5000);
+        })
+    },
+
+    methods: {
+
+      
+      send(){
+        //this one is for who is sendind message
+        this.messages.push({message: this.newMessage, type: 0,});
+        socket.emit('chat-message', {message: this.newMessage, user: this.name});
+        this.newMessage = null;
+      },
+
+      addName() {
+            this.ready = true
+            socket.emit('joined', this.name);
+
+
+      }
+    }
+  })
+ 
+</script>
+</body>
+</html>
+
